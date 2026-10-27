@@ -34,6 +34,8 @@ const TABS = {
     shelf: {icon: 'isle-shelf', label: 'Shelf'},
     calendar: {icon: 'isle-calendar', label: 'Calendar'},
     usage: {icon: 'isle-gauge', label: 'Usage'},
+    stocks: {icon: 'isle-stocks', label: 'Saham'},
+    antigravity: {icon: 'isle-antigravity', label: 'Antigravity'},
 };
 /** How bright a tab's icon is: open, under the pointer, otherwise. */
 const TAB_OPACITY = {open: 255, hover: 230, idle: 140};
@@ -61,6 +63,8 @@ export const ExpandedView = GObject.registerClass({
         'page-settled': {},
         // The current page wants the island wider or narrower.
         'width-changed': {},
+        // The current page wants the island taller or shorter.
+        'height-changed': {},
         // The current page's tint colour changed; see `tint`.
         'tint-changed': {},
         // The current page's 'aura' tint moved: time (s), level (0..1).
@@ -112,6 +116,10 @@ export const ExpandedView = GObject.registerClass({
             page.connect('width-changed', () => {
                 if (page === this.page)
                     this._syncWidth();
+            });
+            page.connect('height-changed', () => {
+                if (page === this.page)
+                    this._syncHeight();
             });
             page.connect('tint-changed', () => {
                 if (page === this.page)
@@ -465,6 +473,7 @@ export const ExpandedView = GObject.registerClass({
         next.setActive(this._active);
         this._syncPage();
         this._syncWidth();
+        this._syncHeight();
         this.emit('tint-changed');
         this.emit('page-changed');
     }
@@ -519,6 +528,21 @@ export const ExpandedView = GObject.registerClass({
                 return i;
         }
         return null;
+    }
+
+    get pageHeight() {
+        const scale = uiScale();
+        return this.page?.preferredHeight ?? (PAGE_HEIGHT * scale);
+    }
+
+    /** Tells the island when the height it should have changed. */
+    _syncHeight() {
+        const pageHeight = this.pageHeight;
+        if (pageHeight === this._pageHeight)
+            return;
+        this._pageHeight = pageHeight;
+        this._pagerArea.height = pageHeight;
+        this.emit('height-changed');
     }
 
     /** Tells the island when the width it should have changed. */
@@ -615,6 +639,9 @@ export const ExpandedView = GObject.registerClass({
     vfunc_scroll_event(event) {
         // A click-style copy let through for a list flips nothing.
         if (this._isCopy(event))
+            return Clutter.EVENT_STOP;
+        // The antigravity chat page never flips on vertical scroll
+        if (this.page?.name === 'antigravity')
             return Clutter.EVENT_STOP;
         // An up/down scroll no page part wanted.
         return this._flipFromScroll(event);

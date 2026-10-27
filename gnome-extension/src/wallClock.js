@@ -11,7 +11,7 @@ let watchers = 0;
 
 /** Calls `callback` whenever the time shown should change; returns how to stop. */
 export function watchClock(callback) {
-    clock ??= new GnomeDesktop.WallClock({time_only: true});
+    clock ??= new GnomeDesktop.WallClock({time_only: true, force_seconds: true});
     watchers++;
     const id = clock.connect('notify::clock', () => callback());
     let stopped = false;

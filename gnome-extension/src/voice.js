@@ -309,6 +309,13 @@ export const VoiceView = GObject.registerClass({
             x_expand: true, visible: false});
         const caret = this._entry.clutter_text;
         caret.connect('activate', () => this._send());
+        caret.connect('key-press-event', (_text, event) => {
+            if (event.get_key_symbol() === Clutter.KEY_Escape) {
+                this.emit('close-requested');
+                return Clutter.EVENT_STOP;
+            }
+            return Clutter.EVENT_PROPAGATE;
+        });
         // Inside the field, as in Messages: a mic while it is empty (speak instead), Send once there are words.
         this._sendIcon = new St.Icon({gicon: icon('isle-mic-symbolic'), icon_size: 14});
         this._sendButton = new St.Bin({style_class: 'isle-voice-send', reactive: true, child: this._sendIcon});
@@ -709,9 +716,10 @@ export const VoiceView = GObject.registerClass({
         this._syncClose();
     }
 
-    // Only an answer in the pill has one: at work there is Stop, and the conversation closes with Esc.
+    // Shows the × close button when hovered (can dismiss while answering, typing, or working).
     _syncClose() {
-        revealClose(this._close, this._pointerOn && ['reply', 'error'].includes(this._phase) && !this.chatOpen);
+        revealClose(this._close, this._pointerOn && !this.chatOpen &&
+            (['reply', 'error', 'typing'].includes(this._phase) || WORKING.includes(this._phase)));
     }
 
     /** Shows the field to type a request in, starting with `initial` (a key typed while it listened); `card` is isled's. */

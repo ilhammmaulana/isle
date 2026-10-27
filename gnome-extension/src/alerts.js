@@ -8,6 +8,7 @@ import GLib from 'gi://GLib';
 import * as Format from './format.js';
 import * as Playback from './playback.js';
 import {notificationIcon, plainBody} from './notifications.js';
+import {icon} from './widgets.js';
 
 const OSD_DURATION = 1500;
 const STATUS_DURATION = 2600;
@@ -515,6 +516,67 @@ export function agentDone(event, look, show) {
             {label: 'OK', primary: true, callback: () => {}},
         ],
         duration: REMINDER_DURATION,
+    };
+}
+
+/** An Antigravity conversation finished; `show` opens Isle's Antigravity tab. */
+export function antigravityDone(conv, show) {
+    const title = conv.title || 'Task Finished';
+    let project = '';
+    if (conv.workspace_uris) {
+        try {
+            const uris = JSON.parse(conv.workspace_uris);
+            if (uris && uris[0]) {
+                const parts = uris[0].split('/').filter(Boolean);
+                project = parts[parts.length - 1] || '';
+            }
+        } catch (_) {}
+    }
+    return {
+        key: `antigravity:${conv.conversation_id}`,
+        appIcon: true,
+        gicon: icon('isle-antigravity'),
+        icon: 'isle-antigravity',
+        closable: true,
+        priority: 'instant',
+        title,
+        titleLines: 2,
+        subtitle: `${[project, 'Antigravity'].filter(Boolean).join(' · ')} · Selesai`,
+        tone: 'good',
+        glow: DONE_GLOW,
+        action: show ? {label: 'Lihat', callback: show} : undefined,
+        onActivate: show,
+        duration: STATUS_DURATION + 4000,
+    };
+}
+
+/** An Antigravity conversation started or is working; `show` opens Isle's Antigravity tab. */
+export function antigravityWorking(conv, show) {
+    const title = conv.title || 'Task in progress';
+    let project = '';
+    if (conv.workspace_uris) {
+        try {
+            const uris = JSON.parse(conv.workspace_uris);
+            if (uris && uris[0]) {
+                const parts = uris[0].split('/').filter(Boolean);
+                project = parts[parts.length - 1] || '';
+            }
+        } catch (_) {}
+    }
+    return {
+        key: `antigravity:working:${conv.conversation_id}`,
+        appIcon: true,
+        gicon: icon('isle-antigravity'),
+        icon: 'isle-antigravity',
+        closable: true,
+        title,
+        titleLines: 2,
+        subtitle: `${[project, 'Antigravity'].filter(Boolean).join(' · ')} · Sedang berjalan...`,
+        tone: 'info',
+        glow: [[0.25, 0.55, 1.0], [0.4, 0.75, 1.0], [0.6, 0.9, 1.0]],
+        action: show ? {label: 'Lihat', callback: show} : undefined,
+        onActivate: show,
+        duration: 3500,
     };
 }
 

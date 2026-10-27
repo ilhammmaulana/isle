@@ -41,6 +41,9 @@ import {ShelfPage} from './pages/shelf.js';
 import {TasksPage} from './pages/tasks.js';
 import {TimerPage} from './pages/timer.js';
 import {UsagePage} from './pages/usage.js';
+import {StocksPage} from './pages/stocks.js';
+import {AntigravityPage} from './pages/antigravity.js';
+import {AntigravityWatcher} from './antigravity.js';
 import {ReminderWatcher} from './reminders.js';
 import {GREETING, InstalledApps, UNDO_MS, VoiceView, stopUnit, actionTypes, aiSettings, openSetUp, openSignIn, runActions, signInHint, stopPending, voiceContext} from './voice.js';
 import {TextWriter} from './writer.js';
@@ -136,7 +139,7 @@ const VOICE_WORKING = ['transcribing', 'thinking', 'acting'];
 
 // Pages that open by default when they have something to show, best first, unless one was picked
 // by hand lately. Notifications count only when some arrived unseen (others were shown as alerts).
-const DEFAULT_PAGE_ORDER = ['call', 'notifications', 'music', 'focus'];
+const DEFAULT_PAGE_ORDER = ['call', 'antigravity', 'notifications', 'music', 'focus'];
 /** The AI agents Isle can hear from (see `Agents1` in the daemon). */
 const AGENT_PROVIDERS = ['claude', 'codex'];
 
@@ -241,6 +244,7 @@ export class Controller {
         this._focusMode = new FocusMode(this._daemon, this._notifications, this._settings);
         this._clipboard = new ClipboardHistory(this._daemon, this._settings);
         this._writer = new TextWriter(this._clipboard);
+        this._antigravity = new AntigravityWatcher();
     }
 
     /** The island and its closed, alert and voice views; the pages follow a step at a time. */
@@ -325,6 +329,23 @@ export class Controller {
                 done();
             }));
         });
+        if (this._antigravity) {
+            this._antigravity.connect('conversation-started', (_watcher, conv) => {
+                this._compact.antigravityRunning = true;
+                this._syncAssistantBusy();
+                this._post(Alerts.antigravityWorking(conv, () => this.expand('antigravity')));
+            });
+            this._antigravity.connect('conversation-finished', (_watcher, conv) => {
+                this._compact.antigravityRunning = this._antigravity.hasRunning;
+                this._syncAssistantBusy();
+                this._chime('complete');
+                this._post(Alerts.antigravityDone(conv, () => this.expand('antigravity')));
+            });
+            this._antigravity.connect('updated', () => {
+                this._compact.antigravityRunning = this._antigravity.hasRunning;
+                this._syncAssistantBusy();
+            });
+        }
         this._syncVoiceEnabled();
         this._syncUsage();
         this._syncEventAlerts();
@@ -349,6 +370,8 @@ export class Controller {
             () => new ShelfPage(this._daemon, this._clipboard, this._settings, size),
             () => new CalendarPage(this._daemon, size),
             () => new UsagePage(this._daemon, size),
+            () => new StocksPage(this._daemon, size),
+            () => new AntigravityPage(this._daemon, this._antigravity, size),
         ];
     }
 
@@ -368,7 +391,9 @@ export class Controller {
             if (expanded.page === this._shelf)
                 this._shelfHelper?.prepare();
             this._shelfHelper?.sync();
+            this._render();
         });
+        expanded.connect('height-changed', () => this._render());
         expanded.connect('page-settled', () => this._shelfHelper?.sync());
         expanded.pageNamed('shelf').connect('helper-area-changed', () => this._shelfHelper?.sync());
         // Lyrics widen the island and wash it with the cover's colour.
@@ -382,7 +407,7 @@ export class Controller {
                 this._island.setTintMotion(time, level);
         });
         // A request still at work shows its progress, as from the closed island; a new one would be lost.
-        expanded.connect('voice-requested', () => this._voiceWorking ? this._reopenVoice() : this._openVoice({typing: true}));
+        expanded.connect('voice-requested', () => this.expand('antigravity'));
         // Settings open in their own window; the island gets out of its way.
         expanded.connect('settings-requested', () => {
             this.collapse();
@@ -873,15 +898,17 @@ export class Controller {
         // either hangs too or sits inside the bar like a notch, covering no window.
         let size, view;
         switch (presentation) {
-        case 'expanded':
+        case 'expanded': {
+            const pageHeight = this._expanded.pageHeight;
             size = {
                 width: this._expanded.preferredWidth,
-                height: (this._onBar ? top : HEADER_WITHOUT_BAR * scale) + (PAGE_HEIGHT + BOTTOM_PADDING) * scale,
+                height: (this._onBar ? top : HEADER_WITHOUT_BAR * scale) + pageHeight + (BOTTOM_PADDING * scale),
                 radius: EXPANDED_RADIUS * scale,
                 shoulder: EXPANDED_SHOULDER * scale,
             };
             view = this._expanded;
             break;
+        }
         case 'voice': {
             // Like an alert, it hangs below the bar (or near the top of the screen).
             const inset = this._blendsIn ? top : PEEK_TOP_GLASS * scale;
@@ -1131,6 +1158,8 @@ export class Controller {
             const rested = Math.hypot(nowX - x, nowY - y) <= px(REST_DISTANCE_PX);
             if (rested && this._voiceWorking)
                 this._reopenVoice({byHover: true});
+            else if (rested && this._antigravity?.hasRunning)
+                this.expand('antigravity');
             else if (rested)
                 this.expand();
             else if (this._island.hovered)
@@ -1188,6 +1217,10 @@ export class Controller {
         // The assistant still at work: its progress, rather than the pages.
         if (!this._expandWanted && this._voiceWorking) {
             this._reopenVoice();
+            return Clutter.EVENT_STOP;
+        }
+        if (!this._expandWanted && this._antigravity?.hasRunning) {
+            this.expand('antigravity');
             return Clutter.EVENT_STOP;
         }
         if (!this._expandWanted) {
@@ -1325,6 +1358,7 @@ export class Controller {
             return;
         this._cancel('collapse');
         this._setKeyboard(false);
+        this._shelfHelper?.sync();
         // Once closed and settled, what changed meanwhile is laid out for next time (see `_warmUp`); the
         // alert and voice views keep their layout, unless the theme changed.
         this._later('warm', WARM_AFTER_CLOSE_MS, () => this._warmUp(!this._viewsWarm));
@@ -1386,10 +1420,19 @@ export class Controller {
                 return;
             }
             this._keyboardGrab = grab;
-            // Clicking anywhere else ends typing and closes the island.
+            // Clicking anywhere else or pressing Esc ends typing and closes the island.
             this._stageCapture = global.stage.connect('captured-event', (_stage, event) => {
+                const type = event.type();
+                if (type === Clutter.EventType.KEY_PRESS && event.get_key_symbol() === Clutter.KEY_Escape) {
+                    if (this._voiceOpen && this._voice.cardWaiting && !this._voice.typing) {
+                        this._voice.decideCard(false);
+                        return Clutter.EVENT_STOP;
+                    }
+                    this.collapse();
+                    return Clutter.EVENT_STOP;
+                }
                 // The shelf helper's window lies over the island: inside too.
-                const press = [Clutter.EventType.BUTTON_PRESS, Clutter.EventType.TOUCH_BEGIN].includes(event.type());
+                const press = [Clutter.EventType.BUTTON_PRESS, Clutter.EventType.TOUCH_BEGIN].includes(type);
                 if (press && !this._shelfHelper.containsPointer() &&
                     !this._island.contains(global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, ...event.get_coords()))) {
                     this.collapse();
@@ -1715,28 +1758,15 @@ export class Controller {
         this._voice.shortcut = this._voiceShortcut;
     }
 
-    // The shortcut (or the face) opens the assistant listening; while listening it finishes,
-    // and once answered it listens again for a follow-up.
+    // The shortcut (Super+I) toggles the Antigravity chat in the Dynamic Island
     _onVoiceKey() {
-        // Hidden by a fullscreen window: it would listen unseen.
         if (!this._island.visible)
             return;
-        if (!this._voiceOpen) {
-            // A request still at work shows its progress; a new one waits until it is done.
-            if (this._voiceWorking)
-                this._reopenVoice();
-            else
-                this._openVoice();
+        if (this._expandWanted && this._expanded.page?.name === 'antigravity') {
+            this.collapse();
             return;
         }
-        // isled's phase, not the view's: the view says listening before isled has started.
-        const phase = this._daemon.state.assistant?.phase;
-        if (phase === 'listening')
-            this._daemon.call('assistant', 'Stop');
-        else if (this._voiceAnswered) {
-            this._autoListens = 0;
-            this._listen();
-        }
+        this.expand('antigravity');
     }
 
     // Opened by Super+I it listens; with `typing` (opened with the mouse) the field is ready instead, and an
@@ -1819,7 +1849,7 @@ export class Controller {
             console.warn(`Isle: could not gather the request's context: ${e.message}`);
             json = JSON.stringify({...aiSettings(this._settings), actions: actionTypes(this._settings)});
         }
-        if (this._voiceOpen && request === this._listenRequest)
+        if ((this._voiceOpen || this._voiceInBackground) && request === this._listenRequest)
             this._sendRequest(request, 'Ask', text, json);
     }
 
@@ -1902,7 +1932,8 @@ export class Controller {
 
     /** The closed island shows the assistant at work. */
     _syncAssistantBusy() {
-        this._compact.assistantBusy = this._voiceWorking;
+        this._compact.assistantBusy = this._voiceWorking || Boolean(this._antigravity?.hasRunning);
+        this._compact.antigravityRunning = Boolean(this._antigravity?.hasRunning);
     }
 
     /** Shows "Listening…" and sends isled a Listen with the request's context; `greet` for a conversation's first. */
@@ -2259,7 +2290,7 @@ export class Controller {
             this._askInAlert(this._deciding.action);
         // Still at work, or typed and not yet taken up (its AI still starting): it carries on, and its answer
         // comes as an alert.
-        const asked = this._voice.phase === 'thinking' && this._sentRequest === this._listenRequest;
+        const asked = VOICE_WORKING.includes(this._voice.phase) || (this._voice.phase === 'thinking' && this._sentRequest === this._listenRequest);
         this._voiceInBackground = asked || VOICE_WORKING.includes(this._daemon.state.assistant?.phase);
         // Still listening as far as it knows: isled may be turning the last words into a request (see `_onAssistant`).
         this._closedListeningAt = !this._voiceInBackground && this._voice.phase === 'listening' ? Date.now() : 0;
@@ -2372,6 +2403,7 @@ export class Controller {
         this._keyboard.destroy();
         this._shelfHelper.destroy();
         this._reminders.destroy();
+        this._antigravity?.destroy();
         // Ending focus mode can turn Do Not Disturb off, which the views
         // still show.
         this._focusMode.destroy();

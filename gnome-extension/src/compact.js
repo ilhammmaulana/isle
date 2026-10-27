@@ -23,8 +23,8 @@ const ASSISTANT_SIZE = 18;
 
 /** Sizes hanging below the top bar, and inside it with smaller text, in CSS pixels. */
 const SIZES = {
-    hanging: {clock: 164, activities: 256, art: 24, artRadius: 6, ring: 20, bars: 16, moon: 14, call: 15},
-    inBar: {clock: 144, activities: 232, art: 22, artRadius: 6, ring: 18, bars: 14, moon: 13, call: 14},
+    hanging: {clock: 180, activities: 268, art: 24, artRadius: 6, ring: 20, bars: 16, moon: 14, call: 15},
+    inBar: {clock: 156, activities: 242, art: 22, artRadius: 6, ring: 18, bars: 14, moon: 13, call: 14},
 };
 /** Between the Do Not Disturb moon and the time, in CSS pixels (as .isle-compact-clock-box's spacing). */
 const MOON_GAP = 6;
@@ -66,6 +66,7 @@ export const CompactView = GObject.registerClass({
         this._recordingDot = new RecordingDot();
         // A call: a green phone, and on the right a red microphone while it is muted.
         this._phone = new St.Icon({gicon: icon('isle-phone-symbolic'), icon_size: 15, style_class: 'isle-call-icon', y_align: Clutter.ActorAlign.CENTER});
+        this._antigravityIcon = new St.Icon({gicon: icon('isle-antigravity'), icon_size: 15, y_align: Clutter.ActorAlign.CENTER});
         this._micOff = new St.Icon({gicon: icon('isle-mic-off-symbolic'), icon_size: 15, style_class: 'isle-call-muted', y_align: Clutter.ActorAlign.CENTER});
         // isled is not running: what needs it cannot work (see the controller's service watch).
         this._serviceDown = new St.Icon({gicon: icon('dialog-warning-symbolic'), icon_size: 15, style_class: 'isle-compact-warning', y_align: Clutter.ActorAlign.CENTER});
@@ -107,7 +108,7 @@ export const CompactView = GObject.registerClass({
         // Each side's sign keeps to its edge, so all sit as far in from the island's ends. The slots are
         // told not to expand, or their children's x_expand (which the alignment needs) would widen them.
         const align = (actors, x_align) => actors.forEach(actor => actor.set({x_align, x_expand: true}));
-        align([this._ring, this._art, this._dot, this._recordingDot, this._phone], Clutter.ActorAlign.START);
+        align([this._ring, this._art, this._dot, this._recordingDot, this._phone, this._antigravityIcon], Clutter.ActorAlign.START);
         align([this._bars, this._micOff, this._serviceDown, this._assistant, this._secondTimer, this._secondCall], Clutter.ActorAlign.END);
 
         // As wide as the privacy dots at the far right, so the clock stays centred.
@@ -222,6 +223,14 @@ export const CompactView = GObject.registerClass({
         this._refresh();
     }
 
+    /** Shows the Antigravity activity on the left when running. */
+    set antigravityRunning(running) {
+        if (running === Boolean(this._antigravityRunning))
+            return;
+        this._antigravityRunning = running;
+        this._refresh();
+    }
+
     /** Fits the view inside the top bar, like a notch, or below it. */
     set inBar(inBar) {
         if (inBar === this._inBar)
@@ -233,6 +242,8 @@ export const CompactView = GObject.registerClass({
         this._bars.maxHeight = this._secondBars.maxHeight = size.bars;
         this._moon.icon_size = size.moon;
         this._phone.icon_size = this._micOff.icon_size = this._secondPhone.icon_size = size.call;
+        if (this._antigravityIcon)
+            this._antigravityIcon.icon_size = size.call;
         if (inBar)
             this.add_style_class_name('isle-compact-in-bar');
         else
@@ -262,14 +273,15 @@ export const CompactView = GObject.registerClass({
         const onCall = this._call.active;
         const widthBefore = this.preferredWidth;
 
-        // The first activity that applies keeps the island: recording, a call, the music, the timer. The
+        const antigravity = Boolean(this._antigravityRunning);
+        // The first activity that applies keeps the island: recording, a call, antigravity, the music, the timer. The
         // next takes the right side.
-        const activities = [recording && 'recording', onCall && 'call', hasTrack && 'music', timerActive && 'timer']
+        const activities = [recording && 'recording', onCall && 'call', antigravity && 'antigravity', hasTrack && 'music', timerActive && 'timer']
             .filter(Boolean);
         const [primary, second] = activities;
         // Left: the activity's sign, else the unread dot. Both slots keep their width when empty, so the centre
         // stays centred.
-        let left = {recording: this._recordingDot, call: this._phone, music: this._art, timer: this._ring}[primary] ?? null;
+        let left = {recording: this._recordingDot, call: this._phone, antigravity: this._antigravityIcon, music: this._art, timer: this._ring}[primary] ?? null;
         if (!left && this._unseen)
             left = this._dot;
         if (this._left.child !== left)

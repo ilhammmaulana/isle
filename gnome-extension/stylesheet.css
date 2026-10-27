@@ -1015,3 +1015,249 @@
 .isle-recording-pill:focus {
   color: #ffffff;
 }
+
+/* Antigravity CLI Experience */
+.isle-code-block {
+  background-color: rgba(14, 14, 20, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  margin: 6px 0;
+}
+
+.isle-code-content {
+  font-family: monospace;
+  font-size: 11px;
+  color: #f2f2f7;
+  padding: 8px 10px;
+}
+
+.isle-tool-card {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.isle-thinking-box {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+/* ── Stock Monitoring ────────────────────────────────── */
+
+.isle-stocks {
+  padding: 0 16px 8px 16px;
+}
+
+.isle-stocks-box {
+  spacing: 4px;
+}
+
+.isle-stocks-header {
+  margin-bottom: 4px;
+}
+
+.isle-stocks-title-box {
+  spacing: 8px;
+}
+
+.isle-stocks-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.isle-stocks-last-updated {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.isle-stocks-actions {
+  spacing: 4px;
+}
+
+.isle-stocks-action-btn {
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.isle-stocks-action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.isle-stocks-add-box {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  spacing: 4px;
+}
+
+.isle-stocks-add-row {
+  spacing: 8px;
+}
+
+#isleIsland .isle-stocks-entry,
+#isleIsland .isle-stocks-entry:focus {
+  font-size: 12px;
+  padding: 2px 4px;
+  border: none;
+  color: #ffffff !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  caret-color: #ffffff;
+  selection-background-color: rgba(255, 255, 255, 0.28);
+  selected-color: #ffffff;
+}
+
+#isleIsland .isle-stocks-entry StLabel.hint-text {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.isle-stocks-submit-btn {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.isle-stocks-submit-btn:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.isle-stocks-submit-btn:active {
+  background-color: rgba(255, 255, 255, 0.35);
+}
+
+.isle-stocks-cancel-btn {
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.isle-stocks-status {
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+.isle-stocks-status.loading {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.isle-stocks-status.success {
+  color: #30d158;
+}
+
+.isle-stocks-status.error {
+  color: #ff453a;
+}
+
+.isle-stocks-list {
+  spacing: 2px;
+}
+
+.isle-stocks-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 24px;
+}
+
+.isle-stock-row {
+  padding: 5px 8px;
+  border-radius: 8px;
+  spacing: 10px;
+}
+
+.isle-stock-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.isle-stock-logo-box {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.isle-stock-initials {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.isle-stock-info {
+  spacing: 1px;
+}
+
+.isle-stock-name-row {
+  spacing: 6px;
+}
+
+.isle-stock-ticker {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.isle-stock-exchange {
+  font-size: 8.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.isle-stock-desc {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.isle-stock-pricing {
+  spacing: 2px;
+}
+
+.isle-stock-price {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.isle-stock-delta {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.isle-stock-delta.up {
+  color: #30d158;
+  background-color: rgba(48, 209, 88, 0.16);
+}
+
+.isle-stock-delta.down {
+  color: #ff453a;
+  background-color: rgba(255, 69, 58, 0.16);
+}
+
+.isle-stock-delta.flat {
+  color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.isle-stock-remove {
+  opacity: 0.35;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.isle-stock-remove:hover {
+  opacity: 1.0;
+  background-color: rgba(255, 69, 58, 0.15);
+  color: #ff453a;
+}
+
+

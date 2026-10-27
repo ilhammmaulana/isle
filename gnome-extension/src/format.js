@@ -19,9 +19,15 @@ export function uses12Hour() {
     return interfaceSettings.get_string('clock-format') === '12h';
 }
 
-/** "14:05", or "2:05" with a 12-hour clock. */
+/** Whether the user prefers showing seconds in GNOME's settings. */
+export function showsSeconds() {
+    interfaceSettings ??= new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+    return interfaceSettings.get_boolean('clock-show-seconds');
+}
+
+/** "14:05:08", or "2:05:08" with a 12-hour clock. */
 export function clockTime(dateTime = GLib.DateTime.new_now_local()) {
-    return dateTime.format(uses12Hour() ? '%l:%M' : '%H:%M').trim();
+    return dateTime.format(uses12Hour() ? '%l:%M:%S' : '%H:%M:%S').trim();
 }
 
 /** "14:05", or "2:05 PM" with a 12-hour clock: a time of day that stands alone. */

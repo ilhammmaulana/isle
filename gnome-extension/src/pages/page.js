@@ -16,6 +16,8 @@ export const Page = GObject.registerClass({
         'request-keyboard': {param_types: [GObject.TYPE_BOOLEAN]},
         // `preferredWidth` changed.
         'width-changed': {},
+        // `preferredHeight` changed.
+        'height-changed': {},
         // `tint` changed.
         'tint-changed': {},
         // A 'aura' tint moved: time (s), level (0..1); see `Island.setTintMotion`.

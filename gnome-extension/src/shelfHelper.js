@@ -386,7 +386,7 @@ export class ShelfHelper extends Signals.EventEmitter {
     /** Takes the window down and gives the tab its own tiles back. */
     _hide() {
         this._resend = false;
-        if (!this._shownRect)
+        if (!this._shownRect && this._placing === 0)
             return;
         this._shownRect = this._shownArea = null;
         this._page.helperActive = false;
