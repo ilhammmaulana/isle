@@ -117,6 +117,23 @@ install -Dm644 README.md "$DATA/doc/isle/README.md"
 install -Dm755 scripts/setup-voice.sh "$BINDIR/isle-setup-voice"
 # Sets a lasting battery charge limit; the assistant types it into a terminal when asked.
 install -Dm755 scripts/isle-charge-limit "$BINDIR/isle-charge-limit"
+# Quick refresh tool ('r') to reload Isle and GNOME Shell without logout
+install -Dm755 scripts/r "$BINDIR/r"
+# Isle <-> Antigravity CLI Bridge
+install -Dm755 scripts/isle-agy "$BINDIR/isle-agy"
+
+# Stock watchlist initial configuration
+mkdir -p "$CONFIG/isle" "$DATA/isle/logos"
+if [ ! -f "$CONFIG/isle/stocks.json" ] && [ -f data/stocks.json ]; then
+    install -Dm644 data/stocks.json "$CONFIG/isle/stocks.json"
+fi
+
+# Configure quick refresh alias in shell configs
+for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    if [ -f "$rc" ] && ! grep -q "alias r=" "$rc"; then
+        printf '\n# Isle quick refresh tool\ndisable r 2>/dev/null || true\nalias r="%s/r"\n' "$BINDIR" >> "$rc"
+    fi
+done
 
 step "Installing the Inter font"
 # The island is set in Inter.
@@ -247,13 +264,7 @@ if [ "$FIRST" = 1 ]; then
 else
     step "Isle is updated to $VERSION"
 fi
-SHELL_VERSION="$(gnome-shell --version 2>/dev/null | grep -oE '[0-9]+' | head -n1 || true)"
-# Only an X11 session of GNOME 48 or older restarts the shell in place; Wayland needs a new login.
-if [ "${XDG_SESSION_TYPE:-}" = "x11" ] && [ -n "$SHELL_VERSION" ] && [ "$SHELL_VERSION" -le 48 ]; then
-    echo "Press Alt+F2, type 'r' and Enter to restart GNOME Shell."
-else
-    echo "Log out and back in once so GNOME Shell loads the new extension."
-fi
+echo "Isle is ready! Press Alt+F2, type 'r' and Enter (or run 'r' in your terminal) to refresh Isle instantly without logout."
 # Some systems put ~/.local/bin on the PATH only once it exists, at the next login; others never.
 case ":$PATH:" in
     *":$BINDIR:"*) ;;

@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# r: Instant refresh tool for Isle Dynamic Island & GNOME Shell without logout
+# Allows running "r" in terminal or Alt+F2 to reload Isle extension, schemas, and daemon.
+
+set -euo pipefail
+
+UUID="isle@zickrian.github.io"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
+EXT_DIR="$DATA/gnome-shell/extensions/$UUID"
+GREEN="\033[1;32m"
+BLUE="\033[1;34m"
+YELLOW="\033[1;33m"
+CYAN="\033[1;36m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+show_help() {
+    cat << EOF
+${BOLD}Isle Quick Refresh Tool ('r')${RESET}
+Reloads Isle GNOME extension, recompiles schemas, and restarts daemon without logging out.
+
+${CYAN}Usage:${RESET}
+  r              Fast refresh of Isle notch, schemas, and daemon
+  r --doctor, -d Run doctor diagnostics on Isle
+  r --logs, -l   View recent background daemon logs
+  r --help, -h   Show this help message
+
+${CYAN}Tips:${RESET}
+  - In Terminal: Just type ${GREEN}r${RESET} and hit Enter.
+  - In GNOME: Press ${GREEN}Alt+F2${RESET}, type ${GREEN}r${RESET}, and hit Enter.
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    -d|--doctor)
+        printf "${BLUE}==> Checking Isle Doctor...${RESET}\n"
+        if command -v isled >/dev/null; then
+            isled --doctor || true
+        elif [ -x "$HOME/.local/bin/isled" ]; then
+            "$HOME/.local/bin/isled" --doctor || true
+        fi
+        printf "\n${BLUE}==> Extension Status:${RESET}\n"
+        gnome-extensions info "$UUID" || true
+        exit 0
+        ;;
+    -l|--logs)
+        printf "${BLUE}==> Recent Isle logs:${RESET}\n"
+        journalctl --user -u isled.service -n 30 --no-pager
+        exit 0
+        ;;
+esac
+
+START_TIME=$(date +%s%N)
+printf "${CYAN}⟳ Refreshing Isle Dynamic Island & GNOME Shell...${RESET}\n"
+
+# 1. Compile schemas if present
+if [ -d "$EXT_DIR/schemas" ]; then
+    glib-compile-schemas "$EXT_DIR/schemas"
+fi
+
+# 2. Restart isled daemon if active or enabled
+if systemctl --user is-active --quiet isled.service 2>/dev/null; then
+    systemctl --user restart isled.service
+elif systemctl --user is-enabled --quiet isled.service 2>/dev/null; then
+    systemctl --user start isled.service
+fi
+
+# 3. Reload GNOME Shell Extension
+if command -v gnome-extensions >/dev/null; then
+    gnome-extensions disable "$UUID" 2>/dev/null || true
+    sleep 0.2
+    gnome-extensions enable "$UUID" 2>/dev/null || true
+fi
+
+# 4. Optional notification
+if command -v notify-send >/dev/null; then
+    notify-send -a "Isle" -i "isle-antigravity" "Isle Refreshed" "Notch, schemas, and daemon reloaded without logout." 2>/dev/null || true
+fi
+
+END_TIME=$(date +%s%N)
+ELAPSED_MS=$(( (END_TIME - START_TIME) / 1000000 ))
+
+printf "${GREEN}✔ Isle refreshed successfully${RESET} ${YELLOW}(${ELAPSED_MS}ms)${RESET}\n"

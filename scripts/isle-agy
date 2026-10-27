@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""
+isle-agy: Bridge and Management CLI between Isle Desktop Island and Antigravity.
+Allows inspecting active conversations, resuming in terminal, managing artifacts,
+and dispatching prompts via D-Bus.
+"""
+
+import sys
+import os
+import json
+import subprocess
+import argparse
+from datetime import datetime
+
+CHAT_JSON_PATH = os.path.expanduser("~/.local/share/isle/chat.json")
+BRAIN_BASE_DIR = os.path.expanduser("~/.gemini/antigravity-cli/brain")
+
+def get_chat_state():
+    if not os.path.exists(CHAT_JSON_PATH):
+        return None
+    try:
+        with open(CHAT_JSON_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error reading {CHAT_JSON_PATH}: {e}", file=sys.stderr)
+        return None
+
+def cmd_status(args):
+    state = get_chat_state()
+    if not state:
+        print("No active Isle chat found.")
+        return
+
+    conv_id = state.get("conversation", "N/A")
+    provider = state.get("provider", "N/A")
+    items = state.get("items", [])
+    last_ts = state.get("last", 0) / 1000.0
+    last_dt = datetime.fromtimestamp(last_ts).strftime("%Y-%m-%d %H:%M:%S") if last_ts else "N/A"
+
+    print("═══════════════════════════════════════════════════")
+    print("           ISLE <-> ANTIGRAVITY STATUS             ")
+    print("═══════════════════════════════════════════════════")
+    print(f"  Provider       : {provider.upper()}")
+    print(f"  Conversation ID: {conv_id}")
+    print(f"  Total Messages : {len(items)}")
+    print(f"  Last Activity  : {last_dt}")
+    
+    brain_dir = os.path.join(BRAIN_BASE_DIR, conv_id)
+    if os.path.exists(brain_dir):
+        artifacts = [f for f in os.listdir(brain_dir) if not f.startswith(".")]
+        print(f"  Artifacts      : {len(artifacts)} files in brain/{conv_id[:8]}...")
+    else:
+        print("  Artifacts      : 0 files")
+
+    if items:
+        print("───────────────────────────────────────────────────")
+        last_item = items[-1]
+        role = last_item.get("role", "unknown").capitalize()
+        text = last_item.get("text", "").strip()
+        first_line = text.split("\n")[0]
+        preview = (first_line[:90] + "...") if len(first_line) > 90 else first_line
+        print(f"  Last {role} Message:")
+        print(f"  \"{preview}\"")
+    print("═══════════════════════════════════════════════════")
+
+def cmd_resume(args):
+    state = get_chat_state()
+    if not state or not state.get("conversation"):
+        print("Error: No active conversation found to resume.", file=sys.stderr)
+        sys.exit(1)
+
+    conv_id = state["conversation"]
+    print(f"Connecting terminal Antigravity to conversation: {conv_id}...")
+    cmd = ["/home/monospace/.local/bin/agy", "--conversation", conv_id]
+    if args.extra:
+        cmd.extend(args.extra)
+    os.execv(cmd[0], cmd)
+
+def cmd_artifacts(args):
+    state = get_chat_state()
+    conv_id = args.id or (state.get("conversation") if state else None)
+    if not conv_id:
+        print("Error: No active conversation found.", file=sys.stderr)
+        sys.exit(1)
+
+    brain_dir = os.path.join(BRAIN_BASE_DIR, conv_id)
+    if not os.path.exists(brain_dir):
+        print(f"No artifacts directory found for conversation {conv_id}.")
+        return
+
+    if args.open:
+        subprocess.run(["xdg-open", brain_dir], check=False)
+        return
+
+    print(f"Artifacts in {brain_dir}:")
+    for root, dirs, files in os.walk(brain_dir):
+        rel = os.path.relpath(root, brain_dir)
+        if rel.startswith("."):
+            continue
+        level = rel.count(os.sep) if rel != "." else 0
+        indent = "  " * level
+        basename = os.path.basename(root)
+        if rel != ".":
+            print(f"{indent}📁 {basename}/")
+        for f in files:
+            if not f.startswith("."):
+                print(f"{indent}  📄 {f}")
+
+def cmd_ask(args):
+    prompt = " ".join(args.prompt).strip()
+    if not prompt:
+        print("Error: Please provide a prompt text.", file=sys.stderr)
+        sys.exit(1)
+
+    state = get_chat_state()
+    conv_id = state.get("conversation") if state else None
+    if not conv_id:
+        print("Error: No active conversation found.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Sending prompt to Antigravity (Conversation: {conv_id[:8]}...): \"{prompt}\"")
+    cmd = ["/home/monospace/.local/bin/agy", "-p", prompt, "--conversation", conv_id]
+    subprocess.run(cmd, check=False)
+
+def cmd_new(args):
+    print("Starting new chat in Isle...")
+    res = subprocess.run([
+        "gdbus", "call", "--session",
+        "--dest", "io.github.zickrian.isle.Daemon",
+        "--object-path", "/io/github/zickrian/isle/Daemon",
+        "--method", "io.github.zickrian.isle.Assistant1.NewChat"
+    ], capture_output=True, text=True)
+
+    if res.returncode == 0:
+        print("New chat session initialized.")
+    else:
+        print(f"Failed to create new chat: {res.stderr.strip()}", file=sys.stderr)
+
+def main():
+    parser = argparse.ArgumentParser(description="Isle <-> Antigravity Bridge CLI")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # status
+    sub = subparsers.add_parser("status", help="Show active Isle conversation status and artifacts")
+    sub.set_defaults(func=cmd_status)
+
+    # resume
+    sub = subparsers.add_parser("resume", help="Resume active Isle conversation in terminal agy")
+    sub.add_argument("extra", nargs="*", help="Extra flags to pass to agy")
+    sub.set_defaults(func=cmd_resume)
+
+    # artifacts
+    sub = subparsers.add_parser("artifacts", help="List or open artifacts for the active conversation")
+    sub.add_argument("--id", help="Explicit conversation ID")
+    sub.add_argument("-o", "--open", action="store_true", help="Open artifacts folder in file manager")
+    sub.set_defaults(func=cmd_artifacts)
+
+    # ask
+    sub = subparsers.add_parser("ask", help="Send a prompt directly to Isle Dynamic Island via D-Bus")
+    sub.add_argument("prompt", nargs="+", help="The prompt text to send")
+    sub.set_defaults(func=cmd_ask)
+
+    # new
+    sub = subparsers.add_parser("new", help="Start a new conversation in Isle")
+    sub.set_defaults(func=cmd_new)
+
+    args = parser.parse_args()
+    args.func(args)
+
+if __name__ == "__main__":
+    main()
